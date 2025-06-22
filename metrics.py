@@ -216,7 +216,7 @@ class MetricSniffer:
             self.src_ips = self._get_all_ip_addresses()
         self.custom_packet_callback = packet_callback
         self.sniffer = AsyncSniffer(
-            filter=filter, prn=self.packet_callback, store=False
+            filter=filter, prn=self.packet_callback, store=False, iface=""
         )
         self.sniffer.start()
 
