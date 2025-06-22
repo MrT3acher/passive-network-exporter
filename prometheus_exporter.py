@@ -63,7 +63,7 @@ class Exporter:
                         header.name,
                         metrics[header],
                         {
-                            "name": self.name,
+                            # "name": self.name,
                             "src_ip": tcp_connection.src_ip,
                             "src_port": tcp_connection.src_port,
                             "dst_ip": tcp_connection.dst_ip,

@@ -20,11 +20,11 @@ class MetricHeader:
     def __str__(self):
         string = ""
         if self.help != "":
-            string += f"# HELP {self.help}\n"
+            string += f"# HELP {self.name} {self.help}\n"
         if self.unit != "":
-            string += f"# UNIT {self.unit}\n"
+            string += f"# UNIT {self.name} {self.unit}\n"
         if self.type != "":
-            string += f"# TYPE {self.type}\n"
+            string += f"# TYPE {self.name} {self.type}\n"
         return string
 
     def __repr__(self):
@@ -51,7 +51,7 @@ class Metric:
         string += self.name
         if len(self.labels) > 0:
             string += "{"
-            string += ",".join(f"{key}={value}" for key, value in self.labels.items())
+            string += ",".join(f"{key}=\"{value}\"" for key, value in self.labels.items())
             string += "} "
             string += str(self.value) + "\n"
         return string
@@ -90,13 +90,13 @@ class TcpConnectionMetrics:
     SEQS_ACKS_HISTORY_TTL = 60
 
     def __init__(self):
-        self.packets_sent = 0
-        self.packets_received = 0
-        self.bytes_sent = 0
-        self.bytes_received = 0
-        self.packet_sent_loss = 0
-        self.packet_received_loss = 0
-        self.jitter = 0.0
+        self.packets_sent_total = 0
+        self.packets_received_total = 0
+        self.bytes_sent_total = 0
+        self.bytes_received_total = 0
+        self.packet_sent_loss_total = 0
+        self.packet_received_loss_total = 0
+        self.jitter_time = 0.0
         self._last_rtt = None  # Last RTT for jitter calculation
         self._rtt_samples = []  # Store RTT samples for jitter calculation
         self._sent_timestamps = {}  # Store timestamps of sent packets
@@ -120,23 +120,23 @@ class TcpConnectionMetrics:
         )
 
     def update_sent(self, packet_size, seq_number, win_size, ack):
-        self.packets_sent += 1
-        self.bytes_sent += packet_size
+        self.packets_sent_total += 1
+        self.bytes_sent_total += packet_size
         self._sent_timestamps[seq_number] = (
             time.time()
         )  # Store the timestamp of the sent packet
         if seq_number in self._sent_seqs and ack in self._sent_acks:
-            self.packet_sent_loss += 1
+            self.packet_sent_loss_total += 1
         self._sent_acks[ack] = 1
         self._sent_seqs[seq_number] = 1
 
     def update_received(self, packet_size, seq_number, win_size, ack):
-        self.packets_received += 1
-        self.bytes_received += packet_size
+        self.packets_received_total += 1
+        self.bytes_received_total += packet_size
         rtt = self.calculate_rtt(seq_number)
         self.calculate_jitter(rtt)
         if seq_number in self._recieved_seqs and ack in self._recieved_acks:
-            self.packet_received_loss += 1
+            self.packet_received_loss_total += 1
         self._recieved_acks[ack] = 1
         self._recieved_seqs[seq_number] = 1
 
@@ -157,54 +157,54 @@ class TcpConnectionMetrics:
             if len(self._rtt_samples) > 1:
                 # Calculate jitter as the average deviation from the mean RTT
                 mean_rtt = sum(self._rtt_samples) / len(self._rtt_samples)
-                self.jitter = sum(
+                self.jitter_time = sum(
                     abs(rtt - mean_rtt) for rtt in self._rtt_samples
                 ) / len(self._rtt_samples)
 
     def get_metrics(self):
         return {
             MetricHeader(
-                "packets_sent",
+                "packets_sent_total",
                 unit="bytes",
-                type="int",
+                type="counter",
                 help="number of packets sent from this machine per connection",
-            ): self.packets_sent,
+            ): self.packets_sent_total,
             MetricHeader(
-                "packets_received",
+                "packets_received_total",
                 unit="bytes",
-                type="int",
+                type="counter",
                 help="number of packets received in this machine per connection",
-            ): self.packets_received,
+            ): self.packets_received_total,
             MetricHeader(
-                "bytes_sent",
+                "bytes_sent_total",
                 unit="bytes",
-                type="int",
+                type="counter",
                 help="number of bytes sent from this machine per connection",
-            ): self.bytes_sent,
+            ): self.bytes_sent_total,
             MetricHeader(
-                "bytes_received",
+                "bytes_received_total",
                 unit="bytes",
-                type="int",
+                type="counter",
                 help="number of packets received in this machine per connection",
-            ): self.bytes_received,
+            ): self.bytes_received_total,
             MetricHeader(
-                "packet_sent_loss",
+                "packet_sent_loss_total",
                 unit="",
-                type="int",
+                type="counter",
                 help="number of sendingt packets lost per connection",
-            ): self.packet_sent_loss,
+            ): self.packet_sent_loss_total,
             MetricHeader(
-                "packet_received_loss",
+                "packet_received_loss_total",
                 unit="",
-                type="int",
+                type="counter",
                 help="number of receiving packets lost per connection",
-            ): self.packet_received_loss,
+            ): self.packet_received_loss_total,
             MetricHeader(
-                "jitter",
+                "jitter_time",
                 unit="seconds",
-                type="float",
+                type="gauge",
                 help="jitter time per connection",
-            ): self.jitter,
+            ): self.jitter_time,
         }
 
 

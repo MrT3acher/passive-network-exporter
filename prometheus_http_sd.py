@@ -3,12 +3,15 @@ import waitress
 import netifaces
 import os
 import json
+import datetime
 
 from prometheus_exporter import Exporter
 
 
 class ExporterSet:
-    def __init__(self, listen_host="0.0.0.0", listen_port=5000, debug=False, external_host=""):
+    def __init__(
+        self, listen_host="0.0.0.0", listen_port=5000, debug=False, external_host=""
+    ):
         self.listen_host = listen_host
         self.listen_port = listen_port
         self.next_exporter_listen_port = listen_port + 1
@@ -47,11 +50,17 @@ class ExporterSet:
         waitress.serve(self.app, host=self.listen_host, port=self.listen_port)
 
     def sd(self):
-        response = {}
-        response["targets"] = [
-            f"{self.external_host}:{exporter.listen_port}"
-            for exporter in self.exporters
-        ]
+        response = []
+        for exporter in self.exporters:
+            response.append(
+                {
+                    "targets": [f"{self.external_host}:{exporter.listen_port}"],
+                    "labels": {
+                        "instance_name": exporter.name,
+                        "start_time": datetime.datetime.now(),
+                    },
+                }
+            )
         return Response(json.dumps(response), mimetype="application/json")
 
     def new_exporter(self, name, packet_filter):
@@ -69,7 +78,10 @@ if __name__ == "__main__":
     EXTERNAL_HOST = os.environ.get("EXTERNAL_HOST", "")
 
     exporter_set = ExporterSet(
-        listen_host=LISTEN_HOST, listen_port=LISTEN_PORT, debug=DEBUG, external_host=EXTERNAL_HOST
+        listen_host=LISTEN_HOST,
+        listen_port=LISTEN_PORT,
+        debug=DEBUG,
+        external_host=EXTERNAL_HOST,
     )
     for name, value in os.environ.items():
         if name.startswith("PACKET_FILTER_"):
