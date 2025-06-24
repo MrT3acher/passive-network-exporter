@@ -232,7 +232,7 @@ class MetricSniffer:
 
         print_thread_info()
 
-        self.packets = []
+        # self.packets = []
         self.metrics = {}
 
     def _get_all_ip_addresses(self):
@@ -267,7 +267,7 @@ class MetricSniffer:
 
         logging.debug("packet_callback")
         logging.debug(packet)
-        self.packets.append(packet)
+        # self.packets.append(packet)
 
         # Process TCP packets
         if TCP in packet:
