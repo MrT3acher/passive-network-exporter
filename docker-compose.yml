@@ -1,4 +1,4 @@
-version: '3.8'  # Specify the version of Docker Compose
+version: '3'  # Specify the version of Docker Compose
 
 services:
   exporter:
