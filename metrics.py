@@ -5,11 +5,6 @@ import time
 import itertools
 
 
-logging.basicConfig(
-    filename="tcp_packets.log", level=logging.INFO, format="%(asctime)s - %(message)s"
-)
-
-
 class MetricHeader:
     def __init__(self, name, unit="", type="", help=""):
         self.name = name
@@ -51,7 +46,7 @@ class Metric:
         string += self.name
         if len(self.labels) > 0:
             string += "{"
-            string += ",".join(f"{key}=\"{value}\"" for key, value in self.labels.items())
+            string += ",".join(f'{key}="{value}"' for key, value in self.labels.items())
             string += "} "
             string += str(self.value) + "\n"
         return string
@@ -216,9 +211,26 @@ class MetricSniffer:
             self.src_ips = self._get_all_ip_addresses()
         self.custom_packet_callback = packet_callback
         self.sniffer = AsyncSniffer(
-            filter=filter, prn=self.packet_callback, store=False, iface=""
+            filter=filter, prn=self.packet_callback, store=False
         )
+        logging.debug("start sniffing")
         self.sniffer.start()
+        logging.debug(self.sniffer.running)
+        logging.debug(self.sniffer)
+
+        def print_thread_info():
+            import threading
+
+            # Get the list of all current threads
+            threads = threading.enumerate()
+
+            print("Active Threads:")
+            for thread in threads:
+                logging.debug(
+                    f"Name: {thread.name}, ID: {thread.ident}, Daemon: {thread.daemon}, Alive: {thread.is_alive()}"
+                )
+
+        print_thread_info()
 
         self.packets = []
         self.metrics = {}
@@ -253,6 +265,8 @@ class MetricSniffer:
         if self.custom_packet_callback is not None:
             self.custom_packet_callback(packet)
 
+        logging.debug("packet_callback")
+        logging.debug(packet)
         self.packets.append(packet)
 
         # Process TCP packets

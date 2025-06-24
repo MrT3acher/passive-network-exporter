@@ -5,6 +5,7 @@ import netifaces
 import os
 import json
 import datetime
+import logging
 
 from prometheus_exporter import Exporter
 
@@ -60,6 +61,7 @@ class ExporterSet:
                     "labels": {
                         "instance_name": exporter.name,
                         "start_time": str(self.start_time),
+                        "packet_filter": exporter.packet_filter,
                     },
                 }
             )
@@ -76,11 +78,17 @@ class ExporterSet:
 if __name__ == "__main__":
     if "PACKET_FILTER_" not in str(os.environ.items()):
         dotenv.load_dotenv()
-        
+
     LISTEN_HOST = os.environ.get("LISTEN_HOST", "0.0.0.0")
     LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "5000"))
     DEBUG = bool(os.environ.get("DEBUG", "0"))
     EXTERNAL_HOST = os.environ.get("EXTERNAL_HOST", "")
+
+    logging.basicConfig(
+        filename="logs.log", level=logging.INFO, format="%(asctime)s - %(message)s"
+    )
+    if DEBUG:
+        logging.root.setLevel(logging.DEBUG)
 
     exporter_set = ExporterSet(
         listen_host=LISTEN_HOST,

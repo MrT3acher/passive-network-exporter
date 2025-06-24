@@ -21,5 +21,7 @@ COPY . .
 # Expose the port the app runs on
 EXPOSE 5000
 
+HEALTHCHECK CMD curl --fail http://localhost:5000/sd || exit 1
+
 # Run the application
 ENTRYPOINT ["python3", "prometheus_http_sd.py"]

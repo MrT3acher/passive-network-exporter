@@ -11,3 +11,8 @@ services:
       - .env
     volumes:
       - .:/app
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5000/sd"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
