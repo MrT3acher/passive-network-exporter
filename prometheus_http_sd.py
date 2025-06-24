@@ -20,6 +20,7 @@ class ExporterSet:
         self.external_host = (
             external_host if external_host != "" else self._get_primary_ip()
         )
+        self.start_time = datetime.datetime.now()
 
         self.exporters = []
 
@@ -58,7 +59,7 @@ class ExporterSet:
                     "targets": [f"{self.external_host}:{exporter.listen_port}"],
                     "labels": {
                         "instance_name": exporter.name,
-                        "start_time": datetime.datetime.now(),
+                        "start_time": str(self.start_time),
                     },
                 }
             )

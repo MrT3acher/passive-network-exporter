@@ -9,3 +9,5 @@ services:
     privileged: true
     env_file:
       - .env
+    volumes:
+      - .:/app
