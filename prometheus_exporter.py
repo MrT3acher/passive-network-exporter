@@ -5,7 +5,7 @@ import threading
 
 from metrics import (
     MetricSniffer,
-    TcpConnection,
+    Connection,
     TcpConnectionMetrics,
     Metric,
     MetricHeader,
@@ -17,9 +17,7 @@ class Exporter:
         self.name = name
         self.listen_port = listen_port
         self.debug = debug
-        self.packet_filter = (
-            "tcp" if packet_filter == "" else f"tcp and {packet_filter}"
-        )
+        self.packet_filter = packet_filter
 
         self._setup_flask()
 
@@ -51,7 +49,7 @@ class Exporter:
         """Endpoint to serve metrics in Prometheus format."""
         classified_metrics = {}
         for tcp_connection in self.sniffer.metrics:
-            tcp_connection: TcpConnection = tcp_connection
+            tcp_connection: Connection = tcp_connection
             metrics: TcpConnectionMetrics = self.sniffer.metrics[tcp_connection]
 
             metrics = metrics.get_metrics()
@@ -82,7 +80,7 @@ class Exporter:
 if __name__ == "__main__":
     LISTEN_PORT = os.environ.get("LISTEN_PORT", "5000")
     DEBUG = bool(os.environ.get("DEBUG", "0"))
-    PACKET_FILTER = os.environ.get("PACKET_FILTER", "tcp")
+    PACKET_FILTER = os.environ.get("PACKET_FILTER", "")
 
     exporter = Exporter(LISTEN_PORT, DEBUG, PACKET_FILTER)
     exporter.run()

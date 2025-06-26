@@ -1,4 +1,4 @@
-from scapy.all import AsyncSniffer, TCP, IP, raw
+from scapy.all import AsyncSniffer, TCP, UDP, IP, raw
 from cachetools import TTLCache
 import logging
 import time
@@ -36,6 +36,49 @@ class MetricHeader:
 
 
 class Metric:
+    PACKETS_SENT_TOTAL = MetricHeader(
+        "packets_sent_total",
+        unit="bytes",
+        type="counter",
+        help="number of packets sent from this machine per connection",
+    )
+    PACKETS_RECEIVED_TOTAL = MetricHeader(
+        "packets_received_total",
+        unit="bytes",
+        type="counter",
+        help="number of packets received in this machine per connection",
+    )
+    BYTES_SENT_TOTAL = MetricHeader(
+        "bytes_sent_total",
+        unit="bytes",
+        type="counter",
+        help="number of bytes sent from this machine per connection",
+    )
+    BYTES_RECEIVED_TOTAL = MetricHeader(
+        "bytes_received_total",
+        unit="bytes",
+        type="counter",
+        help="number of packets received in this machine per connection",
+    )
+    PACKET_SENT_LOSS_TOTAL = MetricHeader(
+        "packet_sent_loss_total",
+        unit="",
+        type="counter",
+        help="number of sendingt packets lost per connection",
+    )
+    PACKET_RECEIVED_LOSS_TOTAL = MetricHeader(
+        "packet_received_loss_total",
+        unit="",
+        type="counter",
+        help="number of receiving packets lost per connection",
+    )
+    JITTER_TIME = MetricHeader(
+        "jitter_time",
+        unit="seconds",
+        type="gauge",
+        help="jitter time per connection",
+    )
+
     def __init__(self, name, value, labels: dict = {}):
         self.name = name
         self.value = value
@@ -52,7 +95,7 @@ class Metric:
         return string
 
 
-class TcpConnection:
+class Connection:
     def __init__(self, src_ip, src_port, dst_ip, dst_port):
         self.src_ip = src_ip
         self.src_port = src_port
@@ -158,58 +201,48 @@ class TcpConnectionMetrics:
 
     def get_metrics(self):
         return {
-            MetricHeader(
-                "packets_sent_total",
-                unit="bytes",
-                type="counter",
-                help="number of packets sent from this machine per connection",
-            ): self.packets_sent_total,
-            MetricHeader(
-                "packets_received_total",
-                unit="bytes",
-                type="counter",
-                help="number of packets received in this machine per connection",
-            ): self.packets_received_total,
-            MetricHeader(
-                "bytes_sent_total",
-                unit="bytes",
-                type="counter",
-                help="number of bytes sent from this machine per connection",
-            ): self.bytes_sent_total,
-            MetricHeader(
-                "bytes_received_total",
-                unit="bytes",
-                type="counter",
-                help="number of packets received in this machine per connection",
-            ): self.bytes_received_total,
-            MetricHeader(
-                "packet_sent_loss_total",
-                unit="",
-                type="counter",
-                help="number of sendingt packets lost per connection",
-            ): self.packet_sent_loss_total,
-            MetricHeader(
-                "packet_received_loss_total",
-                unit="",
-                type="counter",
-                help="number of receiving packets lost per connection",
-            ): self.packet_received_loss_total,
-            MetricHeader(
-                "jitter_time",
-                unit="seconds",
-                type="gauge",
-                help="jitter time per connection",
-            ): self.jitter_time,
+            Metric.PACKETS_SENT_TOTAL: self.packets_sent_total,
+            Metric.PACKETS_RECEIVED_TOTAL: self.packets_received_total,
+            Metric.BYTES_SENT_TOTAL: self.bytes_sent_total,
+            Metric.BYTES_RECEIVED_TOTAL: self.bytes_received_total,
+            Metric.PACKET_SENT_LOSS_TOTAL: self.packet_sent_loss_total,
+            Metric.PACKET_RECEIVED_LOSS_TOTAL: self.packet_received_loss_total,
+            Metric.JITTER_TIME: self.jitter_time,
+        }
+
+
+class UdpConnectionMetrics:
+    def __init__(self):
+        self.packets_sent_total = 0
+        self.packets_received_total = 0
+        self.bytes_sent_total = 0
+        self.bytes_received_total = 0
+
+    def update_sent(self, packet_size):
+        self.packets_sent_total += 1
+        self.bytes_sent_total += packet_size
+
+    def update_received(self, packet_size):
+        self.packets_received_total += 1
+        self.bytes_received_total += packet_size
+
+    def get_metrics(self):
+        return {
+            Metric.PACKETS_SENT_TOTAL: self.packets_sent_total,
+            Metric.PACKETS_RECEIVED_TOTAL: self.packets_received_total,
+            Metric.BYTES_SENT_TOTAL: self.bytes_sent_total,
+            Metric.BYTES_RECEIVED_TOTAL: self.bytes_received_total,
         }
 
 
 class MetricSniffer:
-    def __init__(self, src_ips=[], filter="tcp", packet_callback: callable = None):
+    def __init__(self, src_ips=[], filter="", packet_callback: callable = None):
         if len(src_ips) != 0:
             self.src_ips = src_ips
         else:
             self.src_ips = self._get_all_ip_addresses()
         self.custom_packet_callback = packet_callback
+        self.is_tcp = "tcp" in filter
         self.sniffer = AsyncSniffer(
             filter=filter, prn=self.packet_callback, store=False
         )
@@ -265,20 +298,16 @@ class MetricSniffer:
         if self.custom_packet_callback is not None:
             self.custom_packet_callback(packet)
 
-        logging.debug("packet_callback")
-        logging.debug(packet)
-        # self.packets.append(packet)
-
-        # Process TCP packets
         if TCP in packet:
             src_ip = packet[IP].src
             src_port = packet[TCP].sport
             dst_ip = packet[IP].dst
             dst_port = packet[TCP].dport
+            key = Connection(src_ip, src_port, dst_ip, dst_port)
+
             seq_number = packet[TCP].seq
             win_size = packet[TCP].window
             ack = packet[TCP].ack
-            key = TcpConnection(src_ip, src_port, dst_ip, dst_port)
 
             if key not in self.metrics:
                 self.metrics[key] = TcpConnectionMetrics()
@@ -292,6 +321,24 @@ class MetricSniffer:
                 self.metrics[key].update_received(
                     len(packet), seq_number, win_size, ack
                 )
+        elif UDP in packet:
+            src_ip = packet[IP].src
+            src_port = packet[UDP].sport
+            dst_ip = packet[IP].dst
+            dst_port = packet[UDP].dport
+            key = Connection(src_ip, src_port, dst_ip, dst_port)
+
+            logging.info("UDP")
+            if key not in self.metrics:
+                self.metrics[key] = UdpConnectionMetrics()
+
+            # Update metrics based on whether the packet is sent or received
+            if (
+                self._ipv4tobytes(src_ip) in self.src_ips
+            ):  # SYN flag indicates a sent packet
+                self.metrics[key].update_sent(len(packet))
+            else:  # Assume all other TCP packets are received
+                self.metrics[key].update_received(len(packet))
 
 
 if __name__ == "__main__":
