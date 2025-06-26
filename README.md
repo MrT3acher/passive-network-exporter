@@ -1,7 +1,9 @@
 # How to use?
 1. install python 3.12 or above (deadsnakes repositories recommended)
-2. create virtualenv:
+2. clone the project and create virtualenv:
 ```
+git clone https://github.com/MrT3acher/passive-network-exporter
+cd passive-network-exporter
 python -m venv .venv
 ```
 3. activate virtualenv and install requirements:
